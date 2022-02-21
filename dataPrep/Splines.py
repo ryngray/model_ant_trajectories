@@ -251,30 +251,31 @@ def get_spline(f1,plot=False):
 
 
 
-f = pd.read_csv("../../ants.txt", delimiter=',')
+if __name__ == "__main__":
+    f = pd.read_csv("../../ants.txt", delimiter=',')
 
 
 
-#671, 932,....., #1171, 1198, 1349
-file = open("Spline_Data_X7.csv", "w")
-file2 = open("Spline_Data_Y7.csv","w")
-file3 = open("Spline_Data_T7.csv",'w')
-writer = csv.writer(file)
-writer2 = csv.writer(file2)
-writer3=csv.writer(file3)
-newdat =  {}
-max_int = 428!
-print(len(np.unique(f['id'])))
-ind = 0
-u = np.unique(f['id'])
-for i in tqdm(u[497:]):
-    if(ind > max_int):
-        break
-    f1 = f[f['id']==i]
-    f1.drop_duplicates(subset=['x'],inplace=True)
-    x,y,t = get_spline(f1)
-    writer.writerow(x)
-    writer2.writerow(y)
-    writer3.writerow(t)
-    ind +=1
-file.close()   
+    #671, 932,....., #1171, 1198, 1349
+    file = open("Spline_Data_X7.csv", "w")
+    file2 = open("Spline_Data_Y7.csv","w")
+    file3 = open("Spline_Data_T7.csv",'w')
+    writer = csv.writer(file)
+    writer2 = csv.writer(file2)
+    writer3=csv.writer(file3)
+    newdat =  {}
+    max_int = 428
+    print(len(np.unique(f['id'])))
+    ind = 0
+    u = np.unique(f['id'])
+    for i in tqdm(u[497:]):
+        if(ind > max_int):
+            break
+        f1 = f[f['id']==i]
+        f1.drop_duplicates(subset=['x'],inplace=True)
+        x,y,t = get_spline(f1)
+        writer.writerow(x)
+        writer2.writerow(y)
+        writer3.writerow(t)
+        ind +=1
+    file.close()   
