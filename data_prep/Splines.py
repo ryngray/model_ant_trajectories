@@ -232,7 +232,7 @@ def get_spline(f1,s=2,plot=False):
             g = interpolate.CubicSpline(xj, yj, bc_type='natural')
             gt = interpolate.CubicSpline(xj, tj, bc_type='natural')
             xa, ya, fa = resample_euclid_equidist(np.asarray(xj), np.asarray(yj), s, approx = 'spline', return_approx = True)
-            t_new = g(xa)
+            t_new = gt(xa)
             newx.append(xa)
             newy.append(ya)
             newt.append(t_new)
@@ -244,4 +244,5 @@ def get_spline(f1,s=2,plot=False):
     newt = np.concatenate([x.ravel() for x in newt],axis=0)
     newid = np.multiply(np.ones(len(newx)),f1.id[0])
     edr = pd.DataFrame(np.array([newx, newy, newt, newid]).T, columns=['x','y','t','id'])
+    edr = pd.sort_values(edr,by=['t'])
     return edr
