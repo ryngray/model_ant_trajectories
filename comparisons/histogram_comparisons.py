@@ -228,7 +228,7 @@ def angle_calcs(dat_given, dat_avg):
 	plt.title("Comparison of Max Angle")
 	plt.legend()
 	plt.savefig("angle_gan.png")
-		print("KS Angle Mode:", stats.ks_2samp(dat_avg['mode_angle'], gan_ang_max))
+	print("KS Angle Mode:", stats.ks_2samp(dat_avg['mode_angle'], gan_ang_max))
 
 
 
