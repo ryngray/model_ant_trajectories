@@ -1,16 +1,14 @@
 # Module for manipulating trajectories
-# Use %run ./trackfuns.ipynb in your import section to use functions of this script
 
 # Contents:
-# addMetrics: adds s, theta, alpha to track DataFrame
-# alphaToTrack: creates track (x, y) from alpha
+# 1. addMetrics: adds s, theta, alpha to track DataFrame
+# 2. alphaToTrack: creates track (x, y) from alpha
+# 3. get_edr: EquiDistantly Resamples track
 
 import numpy as np
 import copy
-import Splines
-def get_edr(trackDat, s=2):
-    edr = Splines.get_spline(trackDat,s)
-    return edr
+import math
+import pandas as pd
 
 def addMetrics(trackDat):
     # Calculates step length, heading angle, and turn angle for each track in the data.
@@ -31,9 +29,9 @@ def addMetrics(trackDat):
         alphaPre = np.diff(thetaPre) # Turn angle (left = -, right = +)
         alpha[idx] = np.concatenate(([np.nan], np.degrees((alphaPre + np.pi) % (2*np.pi) - np.pi), [np.nan]), axis=0)
         theta[idx] = np.concatenate(([np.nan], np.degrees(thetaPre)),axis=0)
-    trackDat['s'] = s
-    trackDat['theta'] = theta
-    trackDat['alpha'] = alpha
+    trackDat.loc[:,'s'] = s
+    trackDat.loc[:,'theta'] = theta
+    trackDat.loc[:,'alpha'] = alpha
     return trackDat
 
 
@@ -47,3 +45,31 @@ def alphaToTrack(allAngles):
     yCoords = np.cumsum(dy)
     return xCoords, yCoords
 
+
+
+def get_edr(inDat, s, M=10):
+    # https://stackoverflow.com/questions/19117660/how-to-generate-equispaced-interpolating-values, answered by Ubuntu
+    # Find lots of points on the piecewise linear curve defined by x and y
+    # Inputs: inDat: table of tracks
+    #         s: Resample step length [mm] (should be ~median or mode step length)
+    #         M: #of interpolated points between each input point
+
+    # find lots of points on the piecewise linear curve defined by x and y
+    M = 100*len(inDat.x)
+    t = np.linspace(0, len(inDat.x), M).T
+    x = np.interp(t, np.arange(len(inDat.x)), inDat.x).T
+    y = np.interp(t, np.arange(len(inDat.y)), inDat.y).T
+    tol = 2
+    i, idx = 0, [0]
+    while i < len(x):
+        total_dist = 0
+        for j in range(i+1, len(x)):
+            #total_dist += math.sqrt((x[j]-x[j-1])**2 + (y[j]-y[j-1])**2) # Distance traveled
+            total_dist = math.sqrt((x[j]-x[i])**2 + (y[j]-y[i])**2) # Displacement
+            if total_dist >= tol:
+                idx.append(j)
+                break
+        i = j+1
+
+    edrTrack = pd.DataFrame(np.vstack((x[idx],y[idx],t[idx],np.multiply(np.ones(len(idx)),inDat.id[0]))).T, columns=['x','y','t','id'])
+    return edrTrack
