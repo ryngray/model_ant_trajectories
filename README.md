@@ -4,6 +4,16 @@ Currently just contains ipynb for various models.
 
 Team Members:
 * Ryn Gray
-* Noah Brom
 * Stefan Popp
 * Vahan Huroyan
+
+Requires the following libraries:
+* numpy
+* pandas
+* matplotlib
+* copy
+* scipy
+* math
+* cmath
+* statsmodels
+* Optional: mpld3
