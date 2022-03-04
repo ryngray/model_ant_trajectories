@@ -9,6 +9,7 @@ import numpy as np
 import copy
 import math
 import pandas as pd
+import circ_stats as cs
 
 def addMetrics(trackDat):
     # Calculates step length, heading angle, and turn angle for each track in the data.
@@ -73,3 +74,21 @@ def get_edr(inDat, s, M=10):
 
     edrTrack = pd.DataFrame(np.vstack((x[idx],y[idx],t[idx],np.multiply(np.ones(len(idx)),inDat.id[0]))).T, columns=['x','y','t','id'])
     return edrTrack
+
+
+def turnac(inDat,tauMax):
+    # Circular autocorrelation of turn angles.
+    # Outputs [id, tau (=timelag), rho (=correlation coefficient [-1,1])]
+    ids = np.unique(inDat.id)
+    rhoVec = np.nan
+    for id in ids:
+        track = inDat.alpha[inDat.id==id].values
+        a = track[1:-2] # omitting NaNs
+        for tau in range(tauMax): # rho in 2nd col
+            rhoVec = np.append(rhoVec, cs.corrcoef(a[:-(tau+2)], a[tau:-2]))
+    rhoVec = rhoVec[~np.isnan(rhoVec)]
+    idVec = np.repeat(ids,tauMax)
+    tauVec = np.tile(np.add(range(tauMax),1),len(ids))
+    rhoMat = np.vstack((idVec,tauVec,rhoVec)).T
+    rhoTau = pd.DataFrame(rhoMat,columns=['id','tau','rho'])
+    return rhoTau
