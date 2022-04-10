@@ -1,5 +1,5 @@
 # Module for manipulating trajectories
-# Work with it by adding '%run ../dataPrep/trackfuns.ipynb' instead of 'import...'
+# Work with it by adding '%run ../data_prep/trackfuns.py' instead of 'import...'
 
 # Contents:
 # 1. addMetrics: adds s, theta, alpha to track DataFrame
