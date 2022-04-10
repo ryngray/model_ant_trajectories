@@ -4,6 +4,7 @@
 # 1. addMetrics: adds s, theta, alpha to track DataFrame
 # 2. alphaToTrack: creates track (x, y) from alpha
 # 3. get_edr: EquiDistantly Resamples track
+# 4. turnac: Calculates turn angle autocorrelation
 
 import numpy as np
 import copy
