@@ -4,6 +4,10 @@
 # 1. addMetrics: adds s, theta, alpha to track DataFrame
 # 2. alphaToTrack: creates track (x, y) from alpha
 # 3. get_edr: EquiDistantly Resamples track
+# 4. turnac: turn angle autocorrelation
+# 5. sum_stats: makes summary stats table for histograms
+# 6. movAv_maker: makes moving average
+# 7. unwinder: makes unwound track by subtracting the movAv track from the raw track
 
 import numpy as np
 import copy
@@ -11,6 +15,7 @@ import math
 import pandas as pd
 import circ_stats as cs
 
+# 1
 def addMetrics(trackDat):
     # Calculates step length, heading angle, and turn angle for each track in the data.
     # In: pd.DataFrame of all tracks w/ [x, y, t, id]
@@ -35,7 +40,7 @@ def addMetrics(trackDat):
     trackDat.loc[:,'alpha'] = alpha
     return trackDat
 
-
+# 2
 def alphaToTrack(allAngles):
     # Input: turn angles
     # Output: x, y of the trajectories, starting @ 0, with steplength = 1
@@ -47,7 +52,7 @@ def alphaToTrack(allAngles):
     return xCoords, yCoords
 
 
-
+# 3
 def get_edr(inDat, s, M=10):
     # https://stackoverflow.com/questions/19117660/how-to-generate-equispaced-interpolating-values, answered by Ubuntu
     # Find lots of points on the piecewise linear curve defined by x and y
@@ -75,7 +80,7 @@ def get_edr(inDat, s, M=10):
     edrTrack = pd.DataFrame(np.vstack((x[idx],y[idx],t[idx],np.multiply(np.ones(len(idx)),inDat.id[0]))).T, columns=['x','y','t','id'])
     return edrTrack
 
-
+# 4
 def turnac(inDat,tauMax):
     # Circular autocorrelation of turn angles.
     # Outputs [id, tau (=timelag), rho (=correlation coefficient [-1,1])]
@@ -93,6 +98,7 @@ def turnac(inDat,tauMax):
     rhoTau = pd.DataFrame(rhoMat,columns=['id','tau','rho'])
     return rhoTau
 
+# 5
 def sum_stats(dat):
     ids = np.unique(dat.id)
 
@@ -167,3 +173,127 @@ def sum_stats(dat):
     sumStats['nrCross'] = nrCross
     sumStats['turnAcRho'] = turnAcRho
     return sumStats
+
+# 6
+import statsmodels.api as sm  # For LOWESS smoothing function
+lowess = sm.nonparametric.lowess
+def movAvMaker(inDat, w=26, edr=True):
+    # Make the movAv ('spine' about which the small-scale meanders)
+    # Inputs: inDat = raw data, as df
+    #         w = window size. Bigger = smoother
+    #         edr = is the input edr (equidistantly resampled)? If not, et assumed (equitemporally sampled)
+    inVars = ['x','y','t','id']
+    movAv = pd.DataFrame(np.zeros((len(inDat),len(inVars))), columns=inVars)
+    maMatch = pd.DataFrame(np.zeros((len(inDat),len(inVars))), columns=inVars)
+    d = 0
+    mAidx = 0
+    ids = np.unique(inDat.id)
+    for id in ids:
+        currAnt = inDat[inDat.id == id]
+        currMovAv = pd.DataFrame(np.zeros((len(inDat),len(inVars))), columns=inVars)
+        if edr == True: # For EDR inDat: disregard t
+            currMovAvxPre = lowess(currAnt.x, range(len(currAnt)), frac=w/len(currAnt))
+            currMovAvyPre = lowess(currAnt.y, range(len(currAnt)), frac=w/len(currAnt))
+        else: # For non-EDR inDat: smooth by t
+            currMovAvxPre = lowess(currAnt.x, currAnt.t, frac=w/len(currAnt))
+            currMovAvyPre = lowess(currAnt.y, currAnt.t, frac=w/len(currAnt))
+        currMovAv.x = currMovAvxPre[:,1]
+        currMovAv.y = currMovAvyPre[:,1]
+        currMovAv.t[:] = currAnt.t
+        currMovAv.id = currAnt.id.values
+        movAv = pd.concat([movAv, currMovAv])
+
+        # Get pairs of smallest difference between movAv & raw for d & delta theta analysis
+        dCurr = np.zeros(len(currAnt))
+        mAidxCurr = np.zeros(len(currAnt))
+        # First point: point before it doesn't exist -> can't be indexed
+        dists = np.sqrt(np.subtract(currAnt.x.iloc[0], currMovAv.x.iloc[:1])**2 + np.subtract(currAnt.y.iloc[0], currMovAv.y.iloc[:1])**2)
+        minDistIdx = np.argmin(dists)
+        distOld = dists.iloc[0]
+        if minDistIdx == 0:
+            jdx = 0
+        else:
+            jdx = 1
+            distNew = dists.iloc[1]
+            while distNew<distOld:
+                distOld = distNew
+                jdx += 1
+                distNew = np.linalg.norm(currAnt[['x','y']].iloc[idx]-currMovAv[['x','y']].iloc[jdx+2])
+            jdx -= 1
+        dCurr[0] = distOld
+        mAidxCurr[0] = jdx
+        # Rest of the points
+        for idx in range(1,len(currAnt)):
+            # Get distances to 3 movAv points around the idx
+            dists = np.sqrt(np.subtract(currAnt.x.iloc[idx], currMovAv.x.iloc[idx-1:idx+2])**2 +            np.subtract(currAnt.y.iloc[idx], currMovAv.y.iloc[idx-1:idx+2])**2)
+            if idx == len(currAnt): # Last point: can't calculate dist to next point
+                dists = np.sqrt(np.subtract(currAnt.x.iloc[idx], currMovAv.x.iloc[idx-1:idx+1])**2 +                                np.subtract(currAnt.y.iloc[idx], currMovAv.y.iloc[idx-1:idx+1])**2)
+            minDistIdx = np.argmin(dists) # Which of the 3 pts is closest?
+            distOld = dists.iloc[1]
+            if minDistIdx == 1: # The same idx => get its data [replace w/ match: case: in python =>3.10]
+                jdx = idx # remove when below goes into effect
+            elif minDistIdx == 0: # The idx before
+                jdx = idx-1 # Current investigated movAv idx
+                distNew = dists.iloc[0]
+                while distNew<distOld:
+                    distOld = distNew
+                    jdx -= 1
+                    distNew = np.linalg.norm(currAnt[['x','y']].iloc[idx]-currMovAv[['x','y']].iloc[jdx-1])
+                jdx += 1
+            elif minDistIdx == 2: # The idx after
+                jdx = idx+1 # Current investigated movAv idx
+                distNew = dists.iloc[2]
+                while distNew<distOld:
+                    distOld = distNew
+                    jdx += 1
+                    distNew = np.linalg.norm(currAnt[['x','y']].iloc[idx]-currMovAv[['x','y']].iloc[jdx+2])
+                jdx -= 1
+            dCurr[idx] = distOld
+            mAidxCurr[idx] = jdx
+        mAidx = np.hstack([mAidx,mAidxCurr])
+
+        d = np.hstack([d,dCurr])
+
+    mAidx = mAidx[1:]
+    movAv = movAv[movAv.id != 0] # Deleting padding b/c I allocated too many zero rows above
+    movAv = addMetrics(movAv) # Adds angles etc.
+    maMatch = movAv.iloc[mAidx] # movAv, but rows (=points) correspond to rows of closest points in raw
+    dTheta = (inDat.theta.values - maMatch.theta.values + 180) % (360) - 180 # difference between raw heading & movAv heading
+    maMatch['d'] = d[d != 0]
+    maMatch['dTheta'] = dTheta
+    return movAv,maMatch
+
+# 7
+def unwinder(inAnts, inMovAv):
+    # Subtract the moving average turns from the raw turns, resulting in a track of only small-scale meanders.
+    # Inputs: inAnts: df of raw ant track
+    #         inMovAv: df of moving average track of same length. Must contain dTheta to raw track
+    # Output: track which meanders about the x-axis, instead of the moving average track.
+    ids = np.unique(inAnts.id)
+    unwound = pd.DataFrame(np.zeros((1,5)), columns=['x', 'y', 't', 'id', 'theta'])
+    for id in ids:
+        currAnt = inAnts[inAnts.id==id].reset_index()
+        currUnw = pd.DataFrame(inMovAv[inMovAv.id == id].dTheta.values,columns=['theta'])
+        dx = np.multiply(currAnt.s.values, np.cos(np.deg2rad(currUnw.theta)))
+        dy = np.multiply(currAnt.s.values, np.sin(np.deg2rad(currUnw.theta)))
+        dx[0] = 0
+        dy[0] = 0
+        unwX = np.cumsum(dx)
+        unwY = np.cumsum(dy)
+
+        # Rotating the track to be horizontal
+        rotAng = -np.arctan(unwY.iloc[-2]/unwX.iloc[-2])
+        c, s = np.cos(rotAng), np.sin(rotAng) # Making a rotation matrix
+        j = np.matrix([[c, s], [-s, c]])
+        m = np.dot(j, [unwX, unwY])
+        currUnw.insert(0,'x',unwX * np.cos(rotAng) - unwY * np.sin(rotAng))
+        currUnw.insert(1,'y',unwX * np.sin(rotAng) + unwY * np.cos(rotAng))
+    #        if currUnw.loc[0,'x']<0: # if, for some reason, the track goes toward the negative
+    #            currUnw['x'] = -currUnw['x']
+        currUnw.insert(2,'t',currAnt.t.values)
+        currUnw.insert(3,'id',currAnt.id.values)
+        alphaPre = np.diff(currUnw.theta[1:]) # Turn angle (left = -, right = +)
+        currUnw['alpha'] = np.concatenate(([np.nan], (alphaPre+180) % (360) - 180, [np.nan]), axis=0)
+        unwound = pd.concat([unwound, currUnw])
+    unwound = unwound[1:]
+    return unwound
