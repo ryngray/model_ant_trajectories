@@ -1,11 +1,9 @@
 # Module for manipulating trajectories
-# Work with it by adding '%run ../data_prep/trackfuns.py' instead of 'import...'
 
 # Contents:
 # 1. addMetrics: adds s, theta, alpha to track DataFrame
 # 2. alphaToTrack: creates track (x, y) from alpha
 # 3. get_edr: EquiDistantly Resamples track
-# 4. turnac: Calculates turn angle autocorrelation
 
 import numpy as np
 import copy
@@ -94,3 +92,78 @@ def turnac(inDat,tauMax):
     rhoMat = np.vstack((idVec,tauVec,rhoVec)).T
     rhoTau = pd.DataFrame(rhoMat,columns=['id','tau','rho'])
     return rhoTau
+
+def sum_stats(dat):
+    ids = np.unique(dat.id)
+
+    turnChg = np.empty(len(ids))
+    msd = np.empty(len(ids))
+    nrCross = np.empty(len(ids))
+    turnAcRho = np.empty(len(ids))
+
+    tra = 0 # Current track, for row assignment
+    for id in ids:
+        tr = dat[dat.id==id].reset_index() # tr for track
+
+        # Number of turn direction changes
+        asign = np.sign(tr.alpha)
+        signchange = ((np.roll(asign, 1) - asign) != 0).astype(int)
+        signchange[0] = 0
+        turnChg[tra] = sum(signchange)
+
+        # MSD
+        T = 10 # Nr of sample points
+        tInds = np.linspace(0,len(tr)-1,T).astype(int) # Indices of sample points
+        dists = []
+        j = 1
+        for t in tInds:
+            for tau in tInds[j:]:
+                dists = np.append(dists,(tr.x[tau] - tr.x[t])**2 + (tr.y[tau] - tr.y[t])**2)
+            j+=1
+        msd[tra] = np.mean(dists)
+
+
+        # Nr of path crosses
+        def ccw(A,B,C):
+            return ((C[1]-A[1]) * (B[0]-A[0]) > (B[1]-A[1]) * (C[0]-A[0]))
+
+        # Return true if line segments AB and CD intersect
+        def intersect(A,B,C,D):
+            return (ccw(A,C,D) != ccw(B,C,D) and ccw(A,B,C) != ccw(A,B,D))
+
+        a = np.asarray(tr)
+        crossCount = 0
+        for i in range(len(a)-1):
+            for j in range(i+2, len(a)-1):
+                A = [a[i][0], a[i][1]]
+                B = [a[i+1][0], a[i+1][1]]
+                C = [a[j][0], a[j][1]]
+                D = [a[j+1][0], a[j+1][1]]
+                if(intersect(A,B,C,D)):
+                    crossCount += 1
+        nrCross[tra] = crossCount
+
+        # Turn autocorrelation
+        tauMax = 50
+        a = tr.alpha[1:-1].values # omitting NaNs
+        for tau in range(tauMax): # rho in 2nd col
+            rhoVec = cs.corrcoef(a[:-(tau+2)], a[tau:-2])
+        minRho = np.min(rhoVec)
+        minTau = np.argmin(rhoVec)
+        turnAcRho[tra] = minRho
+
+        tra+=1
+
+    mu = dat.groupby(['id']).mean()
+    SD = dat.groupby(['id']).std()
+
+    sumStats = pd.DataFrame(ids,columns=['id'])
+    sumStats['sMu'] = mu.s.values
+    sumStats['sSD'] = SD.s.values
+    sumStats['alphaMu'] = mu.alpha.values
+    sumStats['alphaSD'] = SD.alpha.values
+    sumStats['turnChg'] = turnChg
+    sumStats['MSD'] = msd
+    sumStats['nrCross'] = nrCross
+    sumStats['turnAcRho'] = turnAcRho
+    return sumStats
