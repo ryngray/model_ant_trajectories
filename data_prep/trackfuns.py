@@ -137,20 +137,20 @@ def sum_stats(dat):
         def intersect(A,B,C,D):
             return (ccw(A,C,D) != ccw(B,C,D) and ccw(A,B,C) != ccw(A,B,D))
 
-        a = np.asarray(tr)
+        a = np.asarray(tr[['x','y']])
         crossCount = 0
         for i in range(len(a)-1):
             for j in range(i+2, len(a)-1):
-                A = [a[i][0], a[i][1]]
+                A = [a[i][0],   a[i][1]]
                 B = [a[i+1][0], a[i+1][1]]
-                C = [a[j][0], a[j][1]]
+                C = [a[j][0],   a[j][1]]
                 D = [a[j+1][0], a[j+1][1]]
                 if(intersect(A,B,C,D)):
                     crossCount += 1
         nrCross[tra] = crossCount
 
         # Turn autocorrelation
-        tauMax = 50
+        tauMax = 30
         a = tr.alpha[1:-1].values # omitting NaNs
         for tau in range(tauMax): # rho in 2nd col
             rhoVec = cs.corrcoef(a[:-(tau+2)], a[tau:-2])
