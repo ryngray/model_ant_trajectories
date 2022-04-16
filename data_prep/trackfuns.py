@@ -152,8 +152,9 @@ def sum_stats(dat):
         # Turn autocorrelation
         tauMax = 30
         a = tr.alpha[1:-1].values # omitting NaNs
-        for tau in range(tauMax): # rho in 2nd col
-            rhoVec = cs.corrcoef(a[:-(tau+2)], a[tau:-2])
+        rhoVec = np.zeros(tauMax)
+        for tau in range(tauMax):
+            rhoVec[tau] = cs.corrcoef(a[:-(tau+2)], a[tau:-2])
         minRho = np.min(rhoVec)
         minTau = np.argmin(rhoVec)
         turnAcRho[tra] = minRho
