@@ -124,7 +124,7 @@ def sum_stats(dat):
         j = 1
         for t in tInds:
             for tau in tInds[j:]:
-                dists = np.append(dists,(tr.x[tau] - tr.x[t])**2 + (tr.y[tau] - tr.y[t])**2)
+                dists = np.append(dists, (tr.x[tau] - tr.x[t])**2 + (tr.y[tau] - tr.y[t])**2)
             j+=1
         msd[tra] = np.mean(dists)
 
@@ -163,11 +163,13 @@ def sum_stats(dat):
 
     mu = dat.groupby(['id']).mean()
     SD = dat.groupby(['id']).std()
+    su = dat.groupby(['id']).sum()
 
     sumStats = pd.DataFrame(ids,columns=['id'])
     sumStats['sMu'] = mu.s.values
     sumStats['sSD'] = SD.s.values
     sumStats['alphaMu'] = mu.alpha.values
+    sumStats['alphaSu'] = su.alpha.values
     sumStats['alphaSD'] = SD.alpha.values
     sumStats['turnChg'] = turnChg
     sumStats['MSD'] = msd
