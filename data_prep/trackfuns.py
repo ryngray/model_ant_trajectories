@@ -29,8 +29,8 @@ def addMetrics(trackDat):
     ids = np.unique(trackDat.id)
     for id in ids:
         idx = trackDat.id == id
-        dist = np.diff(trackDat[idx], axis=0)
-        s[idx] = np.concatenate(([np.nan], np.hypot(dist[:,0], dist[:,1])),axis=0) # Distances between points
+        dist = pd.DataFrame(np.diff(trackDat[idx], axis=0),columns=trackDat.columns)
+        s[idx] = np.concatenate(([np.nan], np.hypot(dist.x, dist.y)),axis=0) # Distances between points
         thetaPre = np.arctan2(np.diff(trackDat.x[idx]), np.diff(trackDat.y[idx])) # Heading angle (N = 0, E = +)
         alphaPre = np.diff(thetaPre) # Turn angle (left = -, right = +)
         alpha[idx] = np.concatenate(([np.nan], np.degrees((alphaPre + np.pi) % (2*np.pi) - np.pi), [np.nan]), axis=0)
@@ -101,7 +101,6 @@ def turnac(inDat,tauMax):
 # 5
 def sum_stats(dat):
     ids = np.unique(dat.id)
-
     turnChg = np.empty(len(ids))
     msd = np.empty(len(ids))
     nrCross = np.empty(len(ids))
@@ -110,7 +109,7 @@ def sum_stats(dat):
     tra = 0 # Current track, for row assignment
     for id in ids:
         tr = dat[dat.id==id].reset_index() # tr for track
-
+        
         # Number of turn direction changes
         asign = np.sign(tr.alpha)
         signchange = ((np.roll(asign, 1) - asign) != 0).astype(int)
